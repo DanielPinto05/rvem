@@ -31,7 +31,7 @@ std::vector<std::string> parse_file(const std::string& filepath){
 
 }
 
-uint32_t reg_to_bit(const std::string& reg){
+uint32_t reg_to_bits(const std::string& reg){
     static const std::unordered_map<std::string, uint32_t> table = {
         {"zero", 0b00000}, 
         {"ra", 0b00001}, 
@@ -74,7 +74,7 @@ uint32_t reg_to_bit(const std::string& reg){
 
 }
 
-uint32_t imm_handler(const std::string& imm){
+uint32_t imm_to_bits(const std::string& imm){
     // convert immediates of all types (decimal, hex, and binary) to uint32_t. '
     // for now, it just does decimal
     uint32_t result = stoi(imm);
@@ -119,13 +119,13 @@ int main(int argc, char *argv[]){
 
         uint32_t  opcode {}; 
 
-        if (instr=="addi"){
+        if (instr=="addi"){ //* addi rd, rs, imm12
             // the rd and rs registers need to be turned into bits
             // then the imm12 needs to be turned into bits
             // then concatenate all
-            std::string rd = words[1]; 
-            std::string rs = words[2]; 
-            std::string imm12 = words[3]; 
+            uint32_t rd = reg_to_bits(words[1]); 
+            uint32_t rs = reg_to_bits(words[2]); 
+            uint32_t imm12 = imm_to_bits(words[3]); 
             opcode = 0b0010011;
 
 
@@ -162,6 +162,8 @@ int main(int argc, char *argv[]){
 
 
         }
+
+
 
     
     return 0; 
