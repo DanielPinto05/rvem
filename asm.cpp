@@ -17,11 +17,11 @@
 */
 std::vector<std::string> parse_file(const std::string& filepath){
 
-    std::ifstream file(filepath); // opens the file 
+    std::ifstream file(filepath, std::ios::in); // opens the file 
 
     std::vector<std::string> program; // stores the line-by-line strings as a series of vectors
 
-    if (!file.is_open()){
+    if (!file.is_open()){ //file.fail() is another option here. 
         std::cerr << "Error opening file.\nExiting assembler program"<<std::endl; 
         return program; 
     }
@@ -117,11 +117,15 @@ std::string hexify(std::uint32_t input){
 * Write an instruction to inputs/file_name
 * @param instruction std::string with the hex-formatted instruction
 * @param out_filepath std::string which filepath to which the instruction will be added to.
+* @param mem_address reference to an int, the current memory address for the instruction. Will increment inside function.
 */
-bool write_out(std::string instruction, std::string out_filepath){
+bool write_out(std::string instruction, std::string out_filepath, std::uint32_t& mem_address){
     std::ofstream output(out_filepath, std::ios::app); // open in append mode, so that stuff doesn't get overwritten
+    std::string addr = hexify(mem_address); 
     if (!output) return false; // there was some problem reading the file
+    output<<addr<<" : "; 
     output << instruction<<std::endl; 
+    mem_address = mem_address + 4; 
     // we don't even need output.close(), as the file automatically closes when we go out of scope.
     return static_cast<bool>(output); // will be true if things went well.
 }
@@ -148,8 +152,10 @@ int main(int argc, char *argv[]){
     //* before writing the new instructions, clear the file if it exists
     std::string out_filepath = "inputs/" + filename + ".txt";
     std::ofstream my_file(out_filepath);
-    my_file<<""; //basically empty?
+    my_file<<""; //basically empty
     my_file.close(); 
+
+    std::uint32_t mem_address = 0; 
 
     //* main loop - going line-by-line of the program
     for (std::string& line: program){
@@ -166,7 +172,7 @@ int main(int argc, char *argv[]){
 
         std::string instr = words[0]; 
         std::string finished_instruction; 
-        std::uint32_t  opcode {}; 
+        std::uint32_t  bits {}; 
 
         if (instr=="addi"){ //* addi rd, rs, imm12
             // the rd and rs registers need to be turned into bits
@@ -175,12 +181,16 @@ int main(int argc, char *argv[]){
             std::uint32_t rd = reg_to_bits(words[1]); 
             std::uint32_t rs = reg_to_bits(words[2]); 
             std::uint32_t imm12 = imm_to_bits(words[3]); 
-            opcode = imm12 <<20 | rs<<15 | 0b000 <<12 | rd<<7| 0b0010011;
-            finished_instruction = hexify(opcode); 
+            bits = imm12 <<20 | rs<<15 | 0b000 <<12 | rd<<7| 0b0010011;
+            finished_instruction = hexify(bits); 
         }
 
-        else if (instr=="add"){
-
+        else if (instr=="add"){ //add rd, rs1, rs2
+            std::uint32_t rd = reg_to_bits(words[1]); 
+            std::uint32_t rs1 = reg_to_bits(words[2]);
+            std::uint32_t rs2 = reg_to_bits(words[3]);
+            bits = rs2<<20|rs1<<15 |rd<<7|0b0110011; 
+            finished_instruction = hexify(bits); 
         }
 
         else if (instr == "and"){
@@ -207,8 +217,8 @@ int main(int argc, char *argv[]){
 
         }
 
-        std::cout<<finished_instruction<<"\n";
-        write_out(finished_instruction, out_filepath); //! note t1.txt is hardcoded
+        // std::cout<<finished_instruction<<"\n";
+        write_out(finished_instruction, out_filepath, mem_address); 
 
 
         }
