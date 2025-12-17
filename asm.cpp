@@ -1,16 +1,21 @@
 #include <fstream>
 #include <iostream>
-#include <sstream> // used for splitting strings
+#include <sstream> // used for std::stringstream and std::ostringstream
+#include <iomanip> // used for std::setw() and std::setfill
 #include <string>
 #include <vector>
-#include <stdint.h> // used for uint32_t typeA
+#include <cstdint> //! used for uint32_t type - NEED TO CHANGE WHOLE THING TO <cstdint>
 #include <unordered_map> // used for converting register names
 #include <algorithm> // for replace
+#include <iomanip> // for std::hex - however it seemed to work without it.
 
+
+/*
+* Parse the input.s file and return a vector of strings, each string a line of the program
+* @param filepath relative filepath to file
+* @return vector of strings, each string is a line of the program.
+*/
 std::vector<std::string> parse_file(const std::string& filepath){
-    // given a filepath for an assembly file, return a vector of strings with each string
-    // being a line of the program
-    // nice because it handles opening and closing of file forus and it tucked away
 
     std::ifstream file(filepath); // opens the file 
 
@@ -31,8 +36,13 @@ std::vector<std::string> parse_file(const std::string& filepath){
 
 }
 
-uint32_t reg_to_bits(const std::string& reg){
-    static const std::unordered_map<std::string, uint32_t> table = {
+/*
+* Convert RISC-V register in conventional names as strings to bit patterns
+* @param reg std::string of the register name.
+* @return std::uint32_t, the corresponding register number
+*/
+std::uint32_t reg_to_bits(const std::string& reg){
+    static const std::unordered_map<std::string, std::uint32_t> table = {
         {"zero", 0b00000}, 
         {"ra", 0b00001}, 
         {"sp", 0b00010}, 
@@ -74,13 +84,46 @@ uint32_t reg_to_bits(const std::string& reg){
 
 }
 
-uint32_t imm_to_bits(const std::string& imm){
+
+/*
+* Convert immediate string to bits
+* @param imm std::string immediate value
+* @return std::uint32_t
+*/
+std::uint32_t imm_to_bits(const std::string& imm){
     // convert immediates of all types (decimal, hex, and binary) to uint32_t. '
     // for now, it just does decimal
-    uint32_t result = stoi(imm);
+    std::uint32_t result = stoi(imm);
     // have some error handling? maybe
     return result;  
     
+}
+
+/*
+* Convert std::uint32_t to a formatted string ready to be written.
+* @param input std::uint32_t, the instruction machine-code
+* @return std::string in the 0xABCD1234 format to be written to output file.
+*/
+std::string hexify(std::uint32_t input){
+    std::ostringstream out; 
+    out<<"0x";
+    out<<std::hex<<std::uppercase; //set some formatting
+    out<<std::setw(8)<<std::setfill('0'); //sets width and the filler character
+    out<<input; 
+    return out.str();  
+}
+
+/*
+* Write an instruction to inputs/file_name
+* @param instruction std::string with the hex-formatted instruction
+* @param out_filepath std::string which filepath to which the instruction will be added to.
+*/
+bool write_out(std::string instruction, std::string out_filepath){
+    std::ofstream output(out_filepath, std::ios::app); // open in append mode, so that stuff doesn't get overwritten
+    if (!output) return false; // there was some problem reading the file
+    output << instruction<<std::endl; 
+    // we don't even need output.close(), as the file automatically closes when we go out of scope.
+    return static_cast<bool>(output); // will be true if things went well.
 }
 
 
@@ -89,18 +132,24 @@ int main(int argc, char *argv[]){
     // unit testing reg_to_bit
 
     if (argc < 2){
-        std::cerr<<"No input file specified.\nExiting assembler program."<<std::endl; 
+        std::cerr<<"Correct format is ./asm input.s output.txt.\nExiting assembler program."<<std::endl; 
         return 1; 
     }
 
     std::string filename = argv[1]; // need to convert char* to string
-    std::string filepath = "inputs/" + filename;  // argv[1] should 
+    std::string in_filepath = "inputs/" + filename + ".s";  // argv[1] should 
 
-    std::vector<std::string> program = parse_file(filepath); 
+    std::vector<std::string> program = parse_file(in_filepath); 
     if (program.size() == 0){ // this is the case where nothing got loaded into the program vector
         return 1; 
     }
 
+
+    //* before writing the new instructions, clear the file if it exists
+    std::string out_filepath = "inputs/" + filename + ".txt";
+    std::ofstream my_file(out_filepath);
+    my_file<<""; //basically empty?
+    my_file.close(); 
 
     //* main loop - going line-by-line of the program
     for (std::string& line: program){
@@ -116,19 +165,18 @@ int main(int argc, char *argv[]){
         }
 
         std::string instr = words[0]; 
-
-        uint32_t  opcode {}; 
+        std::string finished_instruction; 
+        std::uint32_t  opcode {}; 
 
         if (instr=="addi"){ //* addi rd, rs, imm12
             // the rd and rs registers need to be turned into bits
             // then the imm12 needs to be turned into bits
             // then concatenate all
-            uint32_t rd = reg_to_bits(words[1]); 
-            uint32_t rs = reg_to_bits(words[2]); 
-            uint32_t imm12 = imm_to_bits(words[3]); 
-            opcode = 0b0010011;
-
-
+            std::uint32_t rd = reg_to_bits(words[1]); 
+            std::uint32_t rs = reg_to_bits(words[2]); 
+            std::uint32_t imm12 = imm_to_bits(words[3]); 
+            opcode = imm12 <<20 | rs<<15 | 0b000 <<12 | rd<<7| 0b0010011;
+            finished_instruction = hexify(opcode); 
         }
 
         else if (instr=="add"){
@@ -159,12 +207,11 @@ int main(int argc, char *argv[]){
 
         }
 
+        std::cout<<finished_instruction<<"\n";
+        write_out(finished_instruction, out_filepath); //! note t1.txt is hardcoded
 
 
         }
-
-
-
     
     return 0; 
 }
